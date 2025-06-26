@@ -35,28 +35,33 @@ def upload_audio():
     if "audio" not in request.files:
         return jsonify({"error": "No audio file found"}), 400
 
-    audio_file = request.files["audio"]
-    filename = f"{uuid.uuid4()}.wav"
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    audio_file.save(filepath)
+    audio_files = request.files["audio"]
+    questions = request.files["questions"]
+    result=[]
+    for i in range(len(audio_files)):
+        filename = f"{uuid.uuid4()}.wav"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        audio_files[i].save(filepath)
 
-    try:
-        # result = model.transcribe(filepath)
-        # transcript = result["text"]
-        transcript = transcribe_audio(filepath)
-        question = "Tell me about yourself"
-        # Detect emotion
-        emotion = predict_emotion_from_audio(filepath)
-        features = extract_voice_features(filepath)
-        result = evaluate_full_response(
-            question=question,
-            transcript=transcript,
-            emotion=emotion,
-            features=features
-        )
-        return jsonify({"transcript": transcript,"emotion": emotion,"features":features,"result":result})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        try:
+            # result = model.transcribe(filepath)
+            # transcript = result["text"]
+            transcript = transcribe_audio(filepath)
+            question = questions[i]
+            # Detect emotion
+            emotion = predict_emotion_from_audio(filepath)
+            features = extract_voice_features(filepath)
+            result = evaluate_full_response(
+                question=question,
+                transcript=transcript,
+                emotion=emotion,
+                features=features
+            )
+            # return jsonify({"transcript": transcript,"emotion": emotion,"features":features,"result":result})
+            result.append({"transcript": transcript,"emotion": emotion,"features":features,"result":result})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    return jsonify({"result":result})
 
 if __name__ == "__main__":
     app.run(debug=True, port=8000)
