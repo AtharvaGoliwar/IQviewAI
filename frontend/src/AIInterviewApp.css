@@ -573,6 +573,10 @@ body {
   flex: 1;
 }
 
+.audio-box {
+  margin-top: 20px;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .header-content {

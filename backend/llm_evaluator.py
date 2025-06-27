@@ -52,10 +52,10 @@ You will receive:
 ### Based on the above, give an **interview evaluation** in the following JSON format:
 
 {{
-  "score": <0–10>,                # Overall score based on content
+  "score": <0–100>,                # Overall score based on content
   "confidence_score": <0–10>,     # How confidently they sounded
-  "feedback": "<1–2 sentence summary of their performance>",
-  "improvement": "<2-3 suggestions to improve>"
+  "feedback": "<1–2 sentence summary of their performance as string>",
+  "improvement": "<2-3 suggestions to improve and store the suggestions in an array>"
 }}
 
 Be fair but honest — and sound like a helpful interview coach.
@@ -87,3 +87,64 @@ Be fair but honest — and sound like a helpful interview coach.
             "improvement": "Please retry.",
             "error": str(e)
         }
+
+
+def overall_report(question_responses):
+    prompt = f"""
+You are an AI interview coach.
+
+Below is a list of question-answer evaluations from a mock interview. Each item contains:
+- the interview question,
+- the candidate's answer transcript,
+- a score out of 10 for content quality,
+- a confidence score out of 10 (based on voice tone and delivery),
+- the detected emotion during the response,
+- and specific improvement feedback.
+
+Your task is to:
+1. Evaluate the overall performance across all answers.
+2. Identify common strengths and weaknesses in content and tone.
+3. Provide an overall confidence and communication score out of 10.
+4. Provide a total interview performance score out of 10.
+5. Give a 2–3 sentence summary of the candidate’s performance in a string.
+6. Give 3 actionable suggestions to improve for future interviews and store the result in an array.
+
+Here is the data:
+{question_responses}
+
+Respond in the following format:
+
+{{
+  "overall_score": <0-100> ,
+  "confidence_score": <0-10> ,
+  "summary": "...",
+  "advice": ["...", "...", "..."]
+  "number_of_questions":{len(question_responses)}
+}}
+"""
+    try:
+        response = model.generate_content(prompt)
+        raw = response.text
+
+        # Try parsing JSON from Gemini response
+        import json, re
+        json_str = re.search(r'\{[\s\S]*?\}', raw)
+        if json_str:
+            return json.loads(json_str.group())
+        else:
+            return {
+                "overall_score": 0,
+                "confidence_score": 0,
+                "summary": "Could not parse Gemini output.",
+                "advice": [],
+                "raw": raw
+            }
+    except Exception as e:
+        return {
+            "overall_score": 0,
+            "confidence_score": 0,
+            "summary": "Could not parse Gemini output.",
+            "advice": [],
+            "error": str(e)
+        }
+

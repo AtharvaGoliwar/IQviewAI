@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Star,
   TrendingUp,
+  Target,
 } from "lucide-react";
 import "./AIInterviewApp.css";
 
@@ -29,6 +30,9 @@ const AIInterviewApp = () => {
   const [questions, setQuestions] = useState([]);
   const [recordings, setRecordings] = useState([]);
   const [results, setResults] = useState(null);
+  const [audioURLArray, setAudioURLArray] = useState([]);
+  const [currAudioURL, setCurrAudioURL] = useState(null);
+  const [report, setReport] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -102,6 +106,9 @@ const AIInterviewApp = () => {
           type: "audio/wav",
         });
         setRecordings((prev) => [...prev, audioBlob]);
+
+        setAudioURLArray((prev) => [...prev, URL.createObjectURL(audioBlob)]);
+        setCurrAudioURL(URL.createObjectURL(audioBlob));
         stream.getTracks().forEach((track) => track.stop());
       };
 
@@ -137,6 +144,7 @@ const AIInterviewApp = () => {
   };
 
   const handleNextQuestion = () => {
+    setCurrAudioURL(null);
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion((prev) => prev + 1);
     }
@@ -144,17 +152,23 @@ const AIInterviewApp = () => {
 
   const handleCompleteInterview = () => {
     // Simulate AI processing
-    uploadAudio(recordings);
+    uploadAudio(recordings, sampleQuestions.technical);
     setTimeout(() => {
       setResults(sampleResults);
       setCurrentView("results");
     }, 2000);
   };
 
-  const uploadAudio = async (blob) => {
+  const uploadAudio = async (audioArray, questionArray) => {
     const formData = new FormData();
-    formData.append("audio", blob, "recording.wav");
-    formData.append("questions", sampleQuestions.technical);
+
+    // Append each audio blob as "audio"
+    audioArray.forEach((blob, index) => {
+      formData.append("audio", blob, `recording_${index}.wav`);
+    });
+
+    // Append question array as a single JSON string
+    formData.append("questions", JSON.stringify(questionArray));
 
     try {
       const res = await fetch("http://localhost:8000/upload", {
@@ -163,7 +177,25 @@ const AIInterviewApp = () => {
       });
 
       const data = await res.json();
-      alert(data.transcript);
+      console.log(data.transcripts);
+      if (data.error === undefined) {
+        setResults(data.result);
+        try {
+          const res = await fetch("http://localhost:8000/report", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ analysis: data.result }),
+          });
+
+          const data1 = await res.json();
+          console.log("Final Interview Report:", data1.report);
+          setReport(data1.report);
+        } catch (err) {
+          console.error("Report generation failed", err);
+        }
+      }
     } catch (err) {
       console.error("Upload failed", err);
     }
@@ -260,13 +292,21 @@ const AIInterviewApp = () => {
 
               <div className="recording-controls">
                 {!isRecording ? (
-                  <button
-                    onClick={handleStartRecording}
-                    className="btn btn-record"
-                  >
-                    <Mic size={20} />
-                    Start Recording
-                  </button>
+                  <div>
+                    {currAudioURL && (
+                      <div className="audio-box">
+                        <audio controls src={currAudioURL} />
+                      </div>
+                    )}
+                    <button
+                      onClick={handleStartRecording}
+                      disabled={currAudioURL}
+                      className="btn btn-record"
+                    >
+                      <Mic size={20} />
+                      Start Recording
+                    </button>
+                  </div>
                 ) : (
                   <button
                     onClick={handleStopRecording}
@@ -310,7 +350,7 @@ const AIInterviewApp = () => {
         )}
 
         {/* Results View */}
-        {currentView === "results" && results && (
+        {currentView === "results" && results && report && (
           <div className="results-view">
             <div className="results-header">
               <h2 className="results-title">Interview Results</h2>
@@ -318,43 +358,80 @@ const AIInterviewApp = () => {
               <div className="stats-grid">
                 <div className="stat-card stat-primary">
                   <h3>Overall Score</h3>
-                  <div className="stat-value">{results.overallScore}%</div>
+                  <div className="stat-value">
+                    {/* {results.overallScore}% */}
+                    {report.overall_score}%
+                  </div>
                 </div>
                 <div className="stat-card stat-success">
                   <h3>Questions Answered</h3>
-                  <div className="stat-value">{results.answers.length}</div>
+                  <div className="stat-value">
+                    {/* {results.answers.length} */}
+                    {report.number_of_questions}
+                  </div>
                 </div>
               </div>
 
               <div className="summary-section">
                 <h3>Summary</h3>
-                <p className="summary-text">{results.summary}</p>
+                <p className="summary-text">
+                  {/* {results.summary} */}
+                  {report.summary}
+                </p>
               </div>
             </div>
 
             <div className="analysis-section">
               <h3>Question-by-Question Analysis</h3>
               <div className="answers-list">
-                {results.answers.map((answer, index) => (
+                {results.map((item, index) => (
                   <div key={index} className="answer-item">
                     <h4 className="answer-question">
-                      Q{index + 1}: {answer.question}
+                      {/* Q{index + 1}: {answer.question} */}Q{index + 1}:{" "}
+                      {questions[index]}
                     </h4>
-                    <p className="answer-text">{answer.answer}</p>
+                    <p className="answer-text">
+                      {/* {answer.answer} */}
+                      {item.transcript}
+                    </p>
                     <div className="answer-metrics">
                       <span className="metric">
                         <Clock size={16} />
-                        {answer.duration}
+                        {/* {answer.duration} */}
+                        {item.features.total_duration_sec} sec
                       </span>
                       <span
                         className={`metric confidence ${getConfidenceClass(
-                          answer.confidence
+                          // answer.confidence
+                          item.result.confidence_score
                         )}`}
                       >
                         <Star size={16} />
-                        {getConfidenceLabel(answer.confidence)} Confidence (
-                        {answer.confidence}%)
+                        {/* {getConfidenceLabel(answer.confidence)}  */}
+                        {getConfidenceLabel(item.result.confidence_score)}
+                        Confidence ({item.result.confidence_score}%)
                       </span>
+                      <span className="metric">
+                        <Target size={16} />
+                        Score {item.result.score}
+                      </span>
+                    </div>
+                    <div className="improvements-section">
+                      <h3>Feedback</h3>
+                      <p className="improvement-item">{item.result.feedback}</p>
+                    </div>
+                    <br />
+
+                    <div className="improvements-section">
+                      <h3>Improvement Suggestions for this question</h3>
+                      <ul className="improvements-list">
+                        {item.result.improvement.map((tip, index1) => (
+                          <li key={index1} className="improvement-item">
+                            <div className="improvement-bullet"></div>
+                            <p>{tip}</p>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
                 ))}
@@ -362,9 +439,9 @@ const AIInterviewApp = () => {
             </div>
 
             <div className="improvements-section">
-              <h3>Improvement Suggestions</h3>
+              <h3>Overall Advice</h3>
               <ul className="improvements-list">
-                {results.improvements.map((tip, index) => (
+                {report.advice.map((tip, index) => (
                   <li key={index} className="improvement-item">
                     <div className="improvement-bullet"></div>
                     <p>{tip}</p>
