@@ -24,15 +24,17 @@ const AIInterviewApp = () => {
     jobDescription: "",
     companyName: "",
     yearsExperience: "",
+    role: "",
     interviewType: "technical",
   });
 
-  const [questions, setQuestions] = useState([]);
+  const [questions, setQuestions] = useState(["Tell me about yourself"]);
   const [recordings, setRecordings] = useState([]);
   const [results, setResults] = useState(null);
   const [audioURLArray, setAudioURLArray] = useState([]);
   const [currAudioURL, setCurrAudioURL] = useState(null);
   const [report, setReport] = useState(null);
+  const [initialQuestions, setInitialQuestions] = useState([]);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -127,20 +129,43 @@ const AIInterviewApp = () => {
     }
   };
 
-  const handleGenerateInterview = () => {
+  const handleGenerateInterview = async () => {
     if (
       !interviewData.jobDescription ||
       !interviewData.companyName ||
-      !interviewData.yearsExperience
+      !interviewData.yearsExperience ||
+      !interviewData.role
     ) {
       alert("Please fill in all required fields.");
       return;
     }
+    try {
+      const res = await fetch("http://localhost:8000/generate_questions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          company: interviewData.companyName,
+          role: interviewData.role,
+          interview_type: interviewData.interviewType,
+          job_description: interviewData.jobDescription,
+          years_experience: interviewData.yearsExperience,
+        }),
+      });
 
-    setQuestions(sampleQuestions[interviewData.interviewType]);
-    setCurrentQuestion(0);
-    setShowDialog(false);
-    setCurrentView("interview");
+      const data = await res.json();
+      console.log(data.initial_questions.initial_questions); // Use in your interview loop
+      setInitialQuestions(data.initial_questions.initial_questions);
+      data.initial_questions.initial_questions.map((quest) => {
+        setQuestions((prev) => [...prev, quest]);
+      });
+      setCurrentQuestion(0);
+      setShowDialog(false);
+      setCurrentView("interview");
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleNextQuestion = () => {
@@ -152,7 +177,7 @@ const AIInterviewApp = () => {
 
   const handleCompleteInterview = () => {
     // Simulate AI processing
-    uploadAudio(recordings, sampleQuestions.technical);
+    uploadAudio(recordings, questions);
     setTimeout(() => {
       setResults(sampleResults);
       setCurrentView("results");
@@ -478,6 +503,22 @@ const AIInterviewApp = () => {
         <div className="dialog-overlay">
           <div className="dialog">
             <h3 className="dialog-title">Interview Setup</h3>
+
+            <div className="form-group">
+              <label className="form-label">Job Role *</label>
+              <input
+                type="text"
+                value={interviewData.role}
+                onChange={(e) =>
+                  setInterviewData((prev) => ({
+                    ...prev,
+                    role: e.target.value,
+                  }))
+                }
+                className="form-input"
+                placeholder="Enter Job Role..."
+              />
+            </div>
 
             <div className="form-group">
               <label className="form-label">Job Description *</label>

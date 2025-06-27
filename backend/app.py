@@ -7,6 +7,7 @@ from emotion_analysis import predict_emotion_from_audio
 from voice_features import extract_voice_features
 from llm_evaluator import evaluate_full_response
 from llm_evaluator import overall_report
+from llm_evaluator import generate_questions
 
 app = Flask(__name__)
 CORS(app)
@@ -15,7 +16,7 @@ UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Load Whisper model once
-model_size = "base"  # or "base" for slightly better accuracy
+model_size = "tiny"  # or "base" for slightly better accuracy
 model = WhisperModel(model_size, device="cpu", compute_type="int8")  # use int8 for speed
 
 def transcribe_audio(file_path):
@@ -52,18 +53,18 @@ def upload_audio():
             transcript = transcribe_audio(filepath)
             question = questions[i] if i < len(questions) else None
             # Detect emotion
-            emotion = predict_emotion_from_audio(filepath)
+            # emotion = predict_emotion_from_audio(filepath)
             features = extract_voice_features(filepath)
             result = evaluate_full_response(
                 question=question,
                 transcript=transcript,
-                emotion=emotion,
+                emotion="neu",
                 features=features
             )
-            x = {"transcript": transcript,"emotion": emotion,"features":features,"result":result}
+            x = {"transcript": transcript,"emotion": "neu","features":features,"result":result}
             # print(x)
             # return jsonify({"transcript": transcript,"emotion": emotion,"features":features,"result":result})
-            final_res.append({"transcript": transcript,"emotion": emotion,"features":features,"result":result})
+            final_res.append({"transcript": transcript,"emotion": "neu","features":features,"result":result})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
     return jsonify({"result":final_res})
@@ -83,6 +84,17 @@ def generate_report():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/generate_questions", methods=["POST"])
+def generate_custom_questions():
+    data = request.json
+    company = data.get("company")
+    role = data.get("role")
+    interview_type = data.get("interview_type")
+    job_description = data.get("job_description")
+    years = data.get("years_experience")
+
+    questions = generate_questions(company, role, interview_type, job_description,years)
+    return jsonify({"initial_questions": questions})
 
 
 if __name__ == "__main__":

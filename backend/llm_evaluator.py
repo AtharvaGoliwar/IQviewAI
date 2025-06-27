@@ -115,7 +115,7 @@ Here is the data:
 Respond in the following format:
 
 {{
-  "overall_score": <0-100> ,
+  "overall_score": <0-100> ,   score out of 100
   "confidence_score": <0-10> ,
   "summary": "...",
   "advice": ["...", "...", "..."]
@@ -145,6 +145,42 @@ Respond in the following format:
             "confidence_score": 0,
             "summary": "Could not parse Gemini output.",
             "advice": [],
+            "error": str(e)
+        }
+
+
+def generate_questions(company, role, interview_type, job_description,years):
+    prompt=f"""You are an expert technical interviewer. Generate 5 diverse and insightful interview questions for the following job candidate:
+
+- Company: {company}
+- Role: {role}  
+- Interview Type: {interview_type}  
+- Job Description: {job_description}
+- Years of Experience: {years}
+
+Return the result as a JSON array of strings as given below
+{{
+    "initial_questions": ["...","...","...","...","..."] (give 5 questions unrelated to each other)
+}}
+"""
+    try:
+        response = model.generate_content(prompt)
+        raw = response.text
+
+        # Try parsing JSON from Gemini response
+        import json, re
+        json_str = re.search(r'\{[\s\S]*?\}', raw)
+        if json_str:
+            return json.loads(json_str.group())
+        else:
+            return {
+                "initial_questions": [],
+                "raw": raw
+            }
+    except Exception as e:
+        return {
+            "summary": "Could not parse Gemini output.",
+            "initial_questions": [],
             "error": str(e)
         }
 
