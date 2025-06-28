@@ -184,6 +184,21 @@ const AIInterviewApp = () => {
     }, 2000);
   };
 
+  function speak(text) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US";
+    utterance.rate = 1; // 0.5 to 2
+    utterance.pitch = 1;
+
+    speechSynthesis.speak(utterance);
+  }
+
+  useEffect(() => {
+    if (questions.length > 0) {
+      speak(questions[currentQuestion]);
+    }
+  }, [currentQuestion, questions]);
+
   const uploadAudio = async (audioArray, questionArray) => {
     const formData = new FormData();
 
